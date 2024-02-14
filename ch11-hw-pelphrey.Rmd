@@ -1,0 +1,153 @@
+---
+title: 'MECH481A6: Engineering Data Analysis in R'
+subtitle: 'Chapter 11 Homework: Modeling' 
+author: 'Daniel Pelphrey'
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output: html_document
+---
+
+```{r global-options, include=FALSE}
+# set global options for figures, code, warnings, and messages
+knitr::opts_chunk$set(fig.width=6, fig.height=4, fig.path="../figs/",
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# Load packages
+
+```{r load-packages, message=FALSE}
+# load packages for current session
+library(tidyverse) 
+library(gridExtra) 
+```
+
+# Chapter 11 Homework
+
+This homework will give you experience with OLS linear models and testing their assumptions.  
+
+For this first problem set, we will examine issues of ***collinearity among predictor variables*** when fitting an OLS model with two variables. As you recall, assumption 3 from OLS regression requires there be no *collinearity* among predictor variables (the $X_i$'s) in a linear model.  The reason is that the model struggles to assign the correct $\beta_i$ values to each predictor when they are strongly correlated.   
+
+## Question 1
+Fit a series of three linear models on the `bodysize.csv` data frame using `lm()` with `height` as the dependent variable:  
+  1. Model 1: use `waist` as the independent predictor variable:  
+        - `formula = height ~ waist`   
+  2. Model 2: use `mass` as the independent predictor variable:  
+        - `formula = height ~ mass`  
+  3. Model 3: use `mass + waist` as a linear combination of predictor variables:  
+        - `formula = waist + mass`  
+    
+Report the coefficients for each of these models.  What happens to the sign and magnitude of the `mass` and `waist` coefficients when the two variables are included together?  Contrast that with the coefficients when they are used alone.
+
+Evaluate assumption 3 about whether there is collinearity among these variables.  Do you trust the coefficients from model 3 after having seen the individual coefficients reported in models 1 and 2?
+
+
+```{r ch11-homework-q1, echo=FALSE, include=TRUE}
+bodysize <- read_csv(file ="../data/bodysize.csv")
+head(bodysize)
+
+# Model 1: height ~ waist
+waistmod <- lm(height ~ waist, data = bodysize)
+
+# Model 2: height ~ mass
+massmod <- lm(height ~ mass, data = bodysize)
+
+# Model 3: height ~ waist + mass
+wammod <- lm(height ~ waist + mass, data = bodysize)
+
+print(waistmod$coefficients)
+print(massmod$coefficients)
+print(wammod$coefficients)
+```
+
+## Question 2
+Create a new variable in the `bodysize` data frame using `dplyr::mutate`. Call this variable `volume` and make it equal to $waist^2*height$.  Use this new variable to predict `mass`.  
+
+```{r ch11-homework-q2}
+bodysize <- bodysize %>%
+   mutate(volume = waist^2 * height)
+mass2 <- lm(mass ~ volume, data = bodysize)
+
+
+```
+
+Does this variable explain more of the variance in `mass` from the NHANES data? How do you know? (hint: there is both *process* and *quantitative* proof here)
+
+```{r ch11-homework-q2a}
+summary(massmod)
+summary(mass2)
+
+```
+
+Create a scatterplot of `mass` vs. `volume` to examine the fit.  Draw a fit line using `geom_smooth()`.
+
+```{r ch11-homework-q2b}
+massvol <- ggplot(data = bodysize) +
+  geom_point(aes(x = volume,
+                 y = mass),
+             color = "blue",
+             alpha = 0.1)+
+  geom_smooth(aes(x = volume,
+                  y = mass),
+             color = "black",
+             method = "lm",
+             formula = "y ~ x")+
+  labs(title = "Mass vs Volume",
+       x = "Volume",
+       y = "Mass")+
+  theme_bw()
+print(massvol)
+
+```
+
+## Question 3
+Load the `cal_aod.csv` data file and fit a linear model with `aeronet` as the independent variable and `AMOD` as the independent variable. 
+```{r ch11-homework-q3}
+# load data
+data <- read_csv(file ="../data/cal_aod.csv")
+model <- lm(amod ~ aeronet, data = data)
+```
+
+Evaluate model assumptions 4-7 from the coursebook.  Are all these assumptions valid? 
+
+```{r ch11-homework-q3a}
+#assumption 4: mean of residuals is zero
+mean <- mean(model$residuals)
+print(mean)
+
+```
+
+```{r ch11-homework-q3b}
+#assumption 5: residuals are normally distributed
+cal <- ggplot(model$model, 
+              aes(sample = model$residuals)) +
+  geom_qq(alpha = 0.1,
+          color = "blue") +
+  geom_qq_line(color = "black") +
+  scale_y_continuous(limits = c(-0.1,0.15))+
+  theme_bw()
+print(cal)
+
+```
+
+```{r ch11-homework-q3c}
+#assumption 6: the error term is homoscedastic
+homo <- ggplot(data = model$model) + 
+  geom_point(aes(x = model$fitted.values,
+                 y =model$residuals),
+             alpha = 0.1,
+             color = "blue") +
+  geom_hline(yintercept = 0) +
+  theme_bw() 
+
+print(homo)
+
+```
+
+```{r ch11-homework-q3d}
+#assumption 7: no autocorrelation among residuals
+corr <- cor(x = model$residuals, 
+                   y = model$model[,2],
+    method = "pearson" )
+
+print(corr)
+
+```
